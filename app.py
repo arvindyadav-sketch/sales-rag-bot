@@ -57,8 +57,6 @@ def ask_ai(prompt, api_key):
         return f"Error: {str(e)}"
 
 def search_data(filter_word, documents, df, top_k=5):
-    if not filter_word.strip():
-        return []
     fw = filter_word.strip().lower()
     results = []
     for d in documents:
@@ -123,7 +121,6 @@ if uploaded_file is not None:
             "🔍 Filter word (optional):",
             placeholder="Jaise: InTransit, Delhi, Evolution Inc"
         )
-
         if st.button("🚀 Poochho!", type="primary"):
             if sawaal:
                 with st.spinner("🤔 Dhundh raha hoon..."):
@@ -141,13 +138,8 @@ if uploaded_file is not None:
                             sawaal_emb, db_embeddings
                         )[0]
                         top_idx = np.argsort(scores)[::-1][:5]
-                        relevant = [
-                            documents[i] for i in top_idx
-                        ]
-                        st.info(
-                            f"✅ Top {len(relevant)} records mile"
-                        )
-
+                        relevant = [documents[i] for i in top_idx]
+                        st.info(f"✅ Top {len(relevant)} records mile")
                     if relevant:
                         prompt = (
                             f"Sales Records:\n"
@@ -185,12 +177,13 @@ if uploaded_file is not None:
         st.markdown("### 📊 Complete Sales Dashboard")
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("📦 Total Rows", f"{len(df):,}")
+            total_orders = df['OMS Order'].nunique()
+            st.metric("📦 Total Orders", f"{total_orders:,}")
         with col2:
-            d = len(df[df['PO/Delivery Status'] == 'Delivered'])
+            d = df[df['PO/Delivery Status'] == 'Delivered']['OMS Order'].nunique()
             st.metric("✅ Delivered", f"{d:,}")
         with col3:
-            p = len(df[df['PO/Delivery Status'] == 'Payment Pending'])
+            p = df[df['PO/Delivery Status'] == 'Payment Pending']['OMS Order'].nunique()
             st.metric("🔴 Payment Pending", f"{p:,}")
         with col4:
             st.metric("🤝 Partners", f"{df['Partner Name'].nunique():,}")
@@ -198,54 +191,44 @@ if uploaded_file is not None:
         st.markdown("---")
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("#### 📦 Top 10 Partners")
-            st.bar_chart(df['Partner Name'].value_counts().head(10))
+            st.markdown("#### 📦 Top 10 Partners (Unique Orders)")
+            top_p = df.groupby('Partner Name')['OMS Order'].nunique().sort_values(ascending=False).head(10)
+            st.bar_chart(top_p)
         with col2:
-            st.markdown("#### 📊 Order Status (Unique Orders)")
-status_chart = df.groupby(
-    'PO/Delivery Status'
-)['OMS Order'].nunique().sort_values(ascending=False)
-st.bar_chart(status_chart)
+            st.markdown("#### 📊 Status Wise (Unique Orders)")
+            status_chart = df.groupby('PO/Delivery Status')['OMS Order'].nunique().sort_values(ascending=False)
+            st.bar_chart(status_chart)
+
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("#### 📍 Top Locations")
-            st.bar_chart(df['Locations'].value_counts().head(10))
+            st.markdown("#### 📍 Top Locations (Unique Orders)")
+            locs = df.groupby('Locations')['OMS Order'].nunique().sort_values(ascending=False).head(10)
+            st.bar_chart(locs)
         with col2:
-            st.markdown("#### 🚚 Courier Performance")
-            st.bar_chart(df['Courier'].value_counts().head(6))
+            st.markdown("#### 🚚 Courier Performance (Unique Orders)")
+            cour = df.groupby('Courier')['OMS Order'].nunique().sort_values(ascending=False).head(6)
+            st.bar_chart(cour)
 
-        st.markdown("#### 📋 Status Breakdown (Unique Orders)")
-status_df = df.groupby('PO/Delivery Status').agg(
-    Unique_Orders=('OMS Order', 'nunique'),
-    Total_SKUs=('SKU', 'count'),
-    Total_Qty=('Qty', 'sum')
-).reset_index().sort_values(
-    'Unique_Orders', ascending=False
-).reset_index(drop=True)
-status_df.index = status_df.index + 1
-st.dataframe(status_df, use_container_width=True)
+        st.markdown("#### 📋 Complete Status Breakdown (Unique Orders)")
+        status_df = df.groupby('PO/Delivery Status').agg(
+            Unique_Orders=('OMS Order', 'nunique'),
+            Total_SKUs=('SKU', 'count'),
+            Total_Qty=('Qty', 'sum')
+        ).reset_index().sort_values('Unique_Orders', ascending=False).reset_index(drop=True)
+        status_df.index = status_df.index + 1
+        st.dataframe(status_df, use_container_width=True)
+
     with tab3:
         st.markdown("### 💰 Payment Pending Report")
-        pending_df = df[
-            df['PO/Delivery Status'] == 'Payment Pending'
-        ].copy()
+        pending_df = df[df['PO/Delivery Status'] == 'Payment Pending'].copy()
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric(
-                "Total Orders",
-                int(pending_df['OMS Order'].nunique())
-            )
+            st.metric("Total Orders", int(pending_df['OMS Order'].nunique()))
         with col2:
-            st.metric(
-                "Total Qty",
-                f"{int(pending_df['Qty'].sum()):,}"
-            )
+            st.metric("Total Qty", f"{int(pending_df['Qty'].sum()):,}")
         with col3:
-            st.metric(
-                "Partners",
-                int(pending_df['Partner Name'].nunique())
-            )
+            st.metric("Partners", int(pending_df['Partner Name'].nunique()))
 
         st.markdown("---")
         rows = []
