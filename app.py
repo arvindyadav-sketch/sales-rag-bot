@@ -29,10 +29,7 @@ def ask_ai(prompt, api_key):
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={
-                "model": "google/gemma-3-4b-it:free",
-                "messages": [{"role": "user", "content": prompt}]
-            }
+            json={"model": "google/gemma-3-4b-it:free", "messages": [{"role": "user", "content": prompt}]}
         )
         res = response.json()
         if "choices" in res:
@@ -61,12 +58,73 @@ def search_data(filter_word, documents, df, top_k=5):
                 break
     return results[:top_k]
 
+def get_status_breakdown(df):
+    rows = []
+    for status in df['PO/Delivery Status'].unique():
+        grp = df[df['PO/Delivery Status'] == status]
+        rows.append({
+            'Status': str(status),
+            'Unique Orders': int(grp['OMS Order'].nunique()),
+            'Total Qty': int(grp['Qty'].sum())
+        })
+    result = pd.DataFrame(rows).sort_values('Unique Orders', ascending=False).reset_index(drop=True)
+    result.index = result.index + 1
+    return result
+
+def get_partner_pending(pending_df):
+    rows = []
+    for partner in pending_df['Partner Name'].unique():
+        grp = pending_df[pending_df['Partner Name'] == partner]
+        rows.append({
+            'Partner Name': str(partner),
+            'Unique Orders': int(grp['OMS Order'].nunique()),
+            'Total SKUs': int(len(grp)),
+            'Total Qty': int(grp['Qty'].sum())
+        })
+    result = pd.DataFrame(rows).sort_values('Total Qty', ascending=False).reset_index(drop=True)
+    result.index = result.index + 1
+    return result
+
+def get_top_partners(df, n=10):
+    rows = []
+    for partner in df['Partner Name'].unique():
+        grp = df[df['Partner Name'] == partner]
+        rows.append({'Partner': str(partner), 'Orders': int(grp['OMS Order'].nunique())})
+    result = pd.DataFrame(rows).sort_values('Orders', ascending=False).head(n).set_index('Partner')
+    return result
+
+def get_courier_stats(df, n=6):
+    rows = []
+    for courier in df['Courier'].unique():
+        grp = df[df['Courier'] == courier]
+        rows.append({'Courier': str(courier), 'Orders': int(grp['OMS Order'].nunique())})
+    result = pd.DataFrame(rows).sort_values('Orders', ascending=False).head(n).set_index('Courier')
+    return result
+
+def get_location_stats(df, n=10):
+    rows = []
+    for loc in df['Locations'].unique():
+        grp = df[df['Locations'] == loc]
+        rows.append({'Location': str(loc), 'Orders': int(grp['OMS Order'].nunique())})
+    result = pd.DataFrame(rows).sort_values('Orders', ascending=False).head(n).set_index('Location')
+    return result
+
+def get_status_chart(df):
+    rows = []
+    for status in df['PO/Delivery Status'].unique():
+        grp = df[df['PO/Delivery Status'] == status]
+        rows.append({'Status': str(status), 'Orders': int(grp['OMS Order'].nunique())})
+    result = pd.DataFrame(rows).sort_values('Orders', ascending=False).set_index('Status')
+    return result
+
 if uploaded_file is not None:
     df = pd.read_excel(uploaded_file, header=1)
     df = df.fillna('N/A')
     df['Courier'] = df['Courier'].astype(str)
     df['PO/Delivery Status'] = df['PO/Delivery Status'].astype(str)
     df['OMS Order'] = df['OMS Order'].astype(str)
+    df['Partner Name'] = df['Partner Name'].astype(str)
+    df['Locations'] = df['Locations'].astype(str)
     st.sidebar.success(f"✅ {len(df):,} rows loaded!")
 
     @st.cache_data
@@ -91,14 +149,9 @@ if uploaded_file is not None:
 
     with tab1:
         st.markdown("### 💬 Sales Chatbot")
-        sawaal = st.text_input(
-            "❓ Apna sawaal likho:",
-            placeholder="Jaise: LINK TELECOM ke orders ka status?"
-        )
-        filter_word = st.text_input(
-            "🔍 Filter word (optional):",
-            placeholder="Jaise: InTransit, Delhi, Evolution Inc"
-        )
+        sawaal = st.text_input("❓ Apna sawaal likho:", placeholder="Jaise: LINK TELECOM ke orders ka status?")
+        filter_word = st.text_input("🔍 Filter word (optional):", placeholder="Jaise: InTransit, Delhi, Evolution Inc")
+
         if st.button("🚀 Poochho!", type="primary"):
             if sawaal:
                 with st.spinner("🤔 Dhundh raha hoon..."):
@@ -137,10 +190,10 @@ if uploaded_file is not None:
                 st.metric("Partners", int(p['Partner Name'].nunique()))
         with col2:
             if st.button("📦 Top Partners"):
-                st.dataframe(df['Partner Name'].value_counts().head(5))
+                st.dataframe(get_top_partners(df, 5))
         with col3:
             if st.button("🚚 Courier Stats"):
-                st.dataframe(df['Courier'].value_counts().head(5))
+                st.dataframe(get_courier_stats(df, 5))
 
     with tab2:
         st.markdown("### 📊 Complete Sales Dashboard")
@@ -160,30 +213,21 @@ if uploaded_file is not None:
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("#### 📦 Top 10 Partners")
-            top_p = df.groupby('Partner Name')['OMS Order'].nunique().sort_values(ascending=False).head(10)
-            st.bar_chart(top_p)
+            st.bar_chart(get_top_partners(df, 10))
         with col2:
             st.markdown("#### 📊 Status Wise Orders")
-            status_c = df.groupby('PO/Delivery Status')['OMS Order'].nunique().sort_values(ascending=False)
-            st.bar_chart(status_c)
+            st.bar_chart(get_status_chart(df))
 
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("#### 📍 Top Locations")
-            locs = df.groupby('Locations')['OMS Order'].nunique().sort_values(ascending=False).head(10)
-            st.bar_chart(locs)
+            st.bar_chart(get_location_stats(df, 10))
         with col2:
             st.markdown("#### 🚚 Courier Performance")
-            cour = df.groupby('Courier')['OMS Order'].nunique().sort_values(ascending=False).head(6)
-            st.bar_chart(cour)
+            st.bar_chart(get_courier_stats(df, 6))
 
         st.markdown("#### 📋 Complete Status Breakdown")
-        status_df = df.groupby('PO/Delivery Status').agg(
-            Unique_Orders=('OMS Order', 'nunique'),
-            Total_Qty=('Qty', 'sum')
-        ).reset_index().sort_values('Unique_Orders', ascending=False).reset_index(drop=True)
-        status_df.index = status_df.index + 1
-        st.dataframe(status_df, use_container_width=True)
+        st.dataframe(get_status_breakdown(df), use_container_width=True)
 
     with tab3:
         st.markdown("### 💰 Payment Pending Report")
@@ -198,43 +242,27 @@ if uploaded_file is not None:
             st.metric("Partners", int(pending_df['Partner Name'].nunique()))
 
         st.markdown("---")
-        rows = []
-        for partner, grp in pending_df.groupby('Partner Name'):
-            rows.append({
-                'Partner Name': partner,
-                'Unique Orders': int(grp['OMS Order'].nunique()),
-                'Total SKUs': int(len(grp)),
-                'Total Qty': int(grp['Qty'].sum())
-            })
-        result = pd.DataFrame(rows).sort_values(
-            'Total Qty', ascending=False
-        ).reset_index(drop=True)
-        result.index = result.index + 1
+        result = get_partner_pending(pending_df)
         st.markdown("#### 📋 Partner Wise Breakdown")
         st.dataframe(result, use_container_width=True)
 
         csv = result.to_csv(index=False)
-        st.download_button(
-            "📥 Download Report (CSV)",
-            csv, "payment_pending.csv",
-            "text/csv", type="primary"
-        )
+        st.download_button("📥 Download Report (CSV)", csv, "payment_pending.csv", "text/csv", type="primary")
 
         st.markdown("---")
         st.markdown("#### 🔍 Partner Detail")
-        selected = st.selectbox(
-            "Partner choose karo:",
-            options=sorted(pending_df['Partner Name'].unique().tolist())
-        )
+        partner_list = sorted(pending_df['Partner Name'].unique().tolist())
+        selected = st.selectbox("Partner choose karo:", options=partner_list)
         if selected:
             detail_rows = []
             pdata = pending_df[pending_df['Partner Name'] == selected]
-            for oms, grp in pdata.groupby('OMS Order'):
+            for oms in pdata['OMS Order'].unique():
+                grp = pdata[pdata['OMS Order'] == oms]
                 detail_rows.append({
                     'OMS Order': oms,
                     'Total Qty': int(grp['Qty'].sum()),
                     'SKU Count': int(len(grp)),
-                    'Location': grp['Locations'].iloc[0]
+                    'Location': str(grp['Locations'].iloc[0])
                 })
             detail_df = pd.DataFrame(detail_rows)
             st.dataframe(detail_df, use_container_width=True)
