@@ -161,25 +161,17 @@ if uploaded_file is not None:
             st.bar_chart(locs)
         with col2:
             st.markdown("#### 🚚 Courier Performance")
-            courier_data = []
-            for courier, grp in df.groupby('Courier'):
-                courier_data.append({'Courier': courier, 'Orders': int(grp['OMS Order'].nunique())})
-            courier_df = pd.DataFrame(courier_data).sort_values('Orders', ascending=False).head(6).set_index('Courier')
-            st.bar_chart(courier_df)
-
+            df['Courier'] = df['Courier'].astype(str)
+courier_df = df.groupby('Courier')['OMS Order'].nunique().sort_values(ascending=False).head(6)
+st.bar_chart(courier_df)
         st.markdown("#### 📋 Complete Status Breakdown")
-        status_rows = []
-        for status, grp in df.groupby('PO/Delivery Status'):
-            status_rows.append({
-                'Status': status,
-                'Unique Orders': int(grp['OMS Order'].nunique()),
-                'Total SKUs': int(len(grp)),
-                'Total Qty': int(grp['Qty'].sum())
-            })
-        status_df = pd.DataFrame(status_rows).sort_values('Unique Orders', ascending=False).reset_index(drop=True)
-        status_df.index = status_df.index + 1
-        st.dataframe(status_df, use_container_width=True)
-
+        df['PO/Delivery Status'] = df['PO/Delivery Status'].astype(str)
+status_df = df.groupby('PO/Delivery Status').agg(
+    Unique_Orders=('OMS Order', 'nunique'),
+    Total_Qty=('Qty', 'sum')
+).reset_index().sort_values('Unique_Orders', ascending=False).reset_index(drop=True)
+status_df.index = status_df.index + 1
+st.dataframe(status_df, use_container_width=True)
     with tab3:
         st.markdown("### 💰 Payment Pending Report")
         pending_df = df[df['PO/Delivery Status'] == 'Payment Pending'].copy()
