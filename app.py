@@ -212,14 +212,16 @@ if uploaded_file is not None:
             st.markdown("#### 🚚 Courier Performance")
             st.bar_chart(df['Courier'].value_counts().head(6))
 
-        st.markdown("#### 📋 Status Breakdown")
-        status_df = df.groupby(
-            'PO/Delivery Status'
-        ).size().reset_index(name='Count').sort_values(
-            'Count', ascending=False
-        )
-        st.dataframe(status_df, use_container_width=True)
-
+        st.markdown("#### 📋 Status Breakdown (Unique Orders)")
+status_df = df.groupby('PO/Delivery Status').agg(
+    Unique_Orders=('OMS Order', 'nunique'),
+    Total_SKUs=('SKU', 'count'),
+    Total_Qty=('Qty', 'sum')
+).reset_index().sort_values(
+    'Unique_Orders', ascending=False
+).reset_index(drop=True)
+status_df.index = status_df.index + 1
+st.dataframe(status_df, use_container_width=True)
     with tab3:
         st.markdown("### 💰 Payment Pending Report")
         pending_df = df[
