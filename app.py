@@ -5,11 +5,7 @@ import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
-st.set_page_config(
-    page_title="Sales RAG Bot",
-    page_icon="🤖",
-    layout="wide"
-)
+st.set_page_config(page_title="Sales RAG Bot", page_icon="🤖", layout="wide")
 
 st.sidebar.title("⚙️ Settings")
 API_KEY = st.sidebar.text_input("🔑 OpenRouter API Key:", type="password")
@@ -23,6 +19,7 @@ st.markdown("**Apna sales data upload karo aur sawaal poochho!**")
 @st.cache_resource
 def load_model():
     return SentenceTransformer('all-MiniLM-L6-v2')
+
 model = load_model()
 
 def ask_ai(prompt, api_key):
@@ -32,7 +29,10 @@ def ask_ai(prompt, api_key):
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"model": "google/gemma-3-4b-it:free", "messages": [{"role": "user", "content": prompt}]}
+            json={
+                "model": "google/gemma-3-4b-it:free",
+                "messages": [{"role": "user", "content": prompt}]
+            }
         )
         res = response.json()
         if "choices" in res:
@@ -64,6 +64,9 @@ def search_data(filter_word, documents, df, top_k=5):
 if uploaded_file is not None:
     df = pd.read_excel(uploaded_file, header=1)
     df = df.fillna('N/A')
+    df['Courier'] = df['Courier'].astype(str)
+    df['PO/Delivery Status'] = df['PO/Delivery Status'].astype(str)
+    df['OMS Order'] = df['OMS Order'].astype(str)
     st.sidebar.success(f"✅ {len(df):,} rows loaded!")
 
     @st.cache_data
@@ -88,8 +91,14 @@ if uploaded_file is not None:
 
     with tab1:
         st.markdown("### 💬 Sales Chatbot")
-        sawaal = st.text_input("❓ Apna sawaal likho:", placeholder="Jaise: LINK TELECOM ke orders ka status?")
-        filter_word = st.text_input("🔍 Filter word (optional):", placeholder="Jaise: InTransit, Delhi, Evolution Inc")
+        sawaal = st.text_input(
+            "❓ Apna sawaal likho:",
+            placeholder="Jaise: LINK TELECOM ke orders ka status?"
+        )
+        filter_word = st.text_input(
+            "🔍 Filter word (optional):",
+            placeholder="Jaise: InTransit, Delhi, Evolution Inc"
+        )
         if st.button("🚀 Poochho!", type="primary"):
             if sawaal:
                 with st.spinner("🤔 Dhundh raha hoon..."):
@@ -103,7 +112,11 @@ if uploaded_file is not None:
                         relevant = [documents[i] for i in top_idx]
                         st.info(f"✅ Top {len(relevant)} records mile")
                     if relevant:
-                        prompt = f"Sales Records:\n{chr(10).join(relevant)}\n\nSawaal: {sawaal}\nHindi mein seedha jawab do. Numbers include karo."
+                        prompt = (
+                            f"Sales Records:\n{chr(10).join(relevant)}\n\n"
+                            f"Sawaal: {sawaal}\n"
+                            f"Hindi mein seedha jawab do. Numbers include karo."
+                        )
                         jawab = ask_ai(prompt, API_KEY)
                         st.success("✅ AI ka Jawab:")
                         st.write(jawab)
@@ -161,17 +174,17 @@ if uploaded_file is not None:
             st.bar_chart(locs)
         with col2:
             st.markdown("#### 🚚 Courier Performance")
-            df['Courier'] = df['Courier'].astype(str)
-courier_df = df.groupby('Courier')['OMS Order'].nunique().sort_values(ascending=False).head(6)
-st.bar_chart(courier_df)
+            cour = df.groupby('Courier')['OMS Order'].nunique().sort_values(ascending=False).head(6)
+            st.bar_chart(cour)
+
         st.markdown("#### 📋 Complete Status Breakdown")
-        df['PO/Delivery Status'] = df['PO/Delivery Status'].astype(str)
-status_df = df.groupby('PO/Delivery Status').agg(
-    Unique_Orders=('OMS Order', 'nunique'),
-    Total_Qty=('Qty', 'sum')
-).reset_index().sort_values('Unique_Orders', ascending=False).reset_index(drop=True)
-status_df.index = status_df.index + 1
-st.dataframe(status_df, use_container_width=True)
+        status_df = df.groupby('PO/Delivery Status').agg(
+            Unique_Orders=('OMS Order', 'nunique'),
+            Total_Qty=('Qty', 'sum')
+        ).reset_index().sort_values('Unique_Orders', ascending=False).reset_index(drop=True)
+        status_df.index = status_df.index + 1
+        st.dataframe(status_df, use_container_width=True)
+
     with tab3:
         st.markdown("### 💰 Payment Pending Report")
         pending_df = df[df['PO/Delivery Status'] == 'Payment Pending'].copy()
@@ -193,17 +206,26 @@ st.dataframe(status_df, use_container_width=True)
                 'Total SKUs': int(len(grp)),
                 'Total Qty': int(grp['Qty'].sum())
             })
-        result = pd.DataFrame(rows).sort_values('Total Qty', ascending=False).reset_index(drop=True)
+        result = pd.DataFrame(rows).sort_values(
+            'Total Qty', ascending=False
+        ).reset_index(drop=True)
         result.index = result.index + 1
         st.markdown("#### 📋 Partner Wise Breakdown")
         st.dataframe(result, use_container_width=True)
 
         csv = result.to_csv(index=False)
-        st.download_button("📥 Download Report (CSV)", csv, "payment_pending.csv", "text/csv", type="primary")
+        st.download_button(
+            "📥 Download Report (CSV)",
+            csv, "payment_pending.csv",
+            "text/csv", type="primary"
+        )
 
         st.markdown("---")
         st.markdown("#### 🔍 Partner Detail")
-        selected = st.selectbox("Partner choose karo:", options=sorted(pending_df['Partner Name'].unique().tolist()))
+        selected = st.selectbox(
+            "Partner choose karo:",
+            options=sorted(pending_df['Partner Name'].unique().tolist())
+        )
         if selected:
             detail_rows = []
             pdata = pending_df[pending_df['Partner Name'] == selected]
