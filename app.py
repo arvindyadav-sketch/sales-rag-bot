@@ -206,7 +206,9 @@ if uploaded_file is not None:
             st.bar_chart(locs)
         with col2:
             st.markdown("#### 🚚 Courier Performance (Unique Orders)")
-            cour = df.groupby('Courier')['OMS Order'].nunique().sort_values(ascending=False).head(6)
+            cour = df.groupby('Courier')['OMS Order'].nunique().reset_index()
+cour.columns = ['Courier', 'Orders']
+cour = cour.sort_values('Orders', ascending=False).head(6).set_index('Courier')
             st.bar_chart(cour)
 
         st.markdown("#### 📋 Complete Status Breakdown (Unique Orders)")
