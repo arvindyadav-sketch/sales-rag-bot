@@ -103,9 +103,67 @@ if uploaded_file:
         )
 
         if st.button("🚀 Poochho!", type="primary"):
-            if sawaal:
-                with st.spinner("🤔 Answer dhundh raha hoon..."):
-                    if filter_word.strip():
+    if sawaal:
+        with st.spinner("🤔 Answer dhundh raha hoon..."):
+            if filter_word.strip():
+                # Pehle documents mein dhundo
+                filtered = [
+                    d for d in documents
+                    if filter_word.strip().lower() in d.lower()
+                ]
+                # Agar nahi mila toh DataFrame se dhundo
+                if not filtered:
+                    temp = []
+                    for _, row in df.iterrows():
+                        row_text = (
+                            f"Partner: {row['Partner Name']} | "
+                            f"SKU: {row['SKU']} | "
+                            f"Qty: {row['Qty']} | "
+                            f"Location: {row['Locations']} | "
+                            f"Status: {row['PO/Delivery Status']} | "
+                            f"Current: {row['Current Status']} | "
+                            f"Pending Days: {row['Pending Days']} | "
+                            f"Courier: {row['Courier']}"
+                        )
+                        if filter_word.strip().lower() in row_text.lower():
+                            temp.append(row_text)
+                        if len(temp) >= 5:
+                            break
+                    filtered = temp
+                relevant = filtered[:5]
+                st.info(
+                    f"✅ '{filter_word}' → "
+                    f"{len(filtered)} records mile"
+                )
+            else:
+                sawaal_emb = model.encode([sawaal])
+                scores = cosine_similarity(
+                    sawaal_emb, db_embeddings
+                )[0]
+                top_idx = np.argsort(scores)[::-1][:5]
+                relevant = [documents[i] for i in top_idx]
+                st.info(
+                    f"✅ Top {len(relevant)} records mile"
+                )
+
+            if relevant:
+                prompt = f"""
+Sales Records:
+{chr(10).join(relevant)}
+
+Sawaal: {sawaal}
+Hindi mein seedha aur accurate jawab do.
+Numbers aur facts include karo.
+"""
+                jawab = ask_ai(prompt, API_KEY)
+                st.success("✅ AI ka Jawab:")
+                st.write(jawab)
+
+                with st.expander("🔍 Records dekho"):
+                    for i, rec in enumerate(relevant):
+                        st.text(f"{i+1}. {rec}")
+            else:
+                st.warning("⚠️ Koi record nahi mila!")
     filtered = [
         d for d in documents
         if filter_word.strip().lower() in d.lower()
