@@ -201,9 +201,11 @@ if uploaded_file is not None:
             st.markdown("#### 📦 Top 10 Partners")
             st.bar_chart(df['Partner Name'].value_counts().head(10))
         with col2:
-            st.markdown("#### 📊 Order Status")
-            st.bar_chart(df['PO/Delivery Status'].value_counts())
-
+            st.markdown("#### 📊 Order Status (Unique Orders)")
+status_chart = df.groupby(
+    'PO/Delivery Status'
+)['OMS Order'].nunique().sort_values(ascending=False)
+st.bar_chart(status_chart)
         col1, col2 = st.columns(2)
         with col1:
             st.markdown("#### 📍 Top Locations")
