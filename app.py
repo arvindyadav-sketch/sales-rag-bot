@@ -11,7 +11,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# Sidebar
 st.sidebar.title("⚙️ Settings")
 API_KEY = st.sidebar.text_input(
     "🔑 OpenRouter API Key:",
@@ -25,7 +24,6 @@ uploaded_file = st.sidebar.file_uploader(
     type=['xlsx', 'xls']
 )
 
-# Main Title
 st.title("🤖 My Sales RAG Bot")
 st.markdown("**Apna sales data upload karo aur sawaal poochho!**")
 
@@ -60,12 +58,10 @@ def ask_ai(prompt, api_key):
         return f"Error: {str(e)}"
 
 if uploaded_file:
-    # Data load
     df = pd.read_excel(uploaded_file, header=1)
     df = df.fillna('N/A')
     st.sidebar.success(f"✅ {len(df):,} rows loaded!")
 
-    # Documents prepare
     @st.cache_data
     def prepare_docs(fname):
         def row_to_text(row):
@@ -87,19 +83,15 @@ if uploaded_file:
     with st.spinner("🔄 Data prepare ho raha hai..."):
         documents, db_embeddings = prepare_docs(uploaded_file.name)
 
-    # TABS
     tab1, tab2, tab3 = st.tabs([
         "💬 Chatbot",
         "📊 Dashboard",
         "💰 Payment Pending"
     ])
 
-    # ================================
     # TAB 1: CHATBOT
-    # ================================
     with tab1:
         st.markdown("### 💬 Sales Chatbot")
-        st.markdown("Koi bhi sawaal poochho apne sales data se!")
 
         sawaal = st.text_input(
             "❓ Apna sawaal likho:",
@@ -113,8 +105,6 @@ if uploaded_file:
         if st.button("🚀 Poochho!", type="primary"):
             if sawaal:
                 with st.spinner("🤔 Answer dhundh raha hoon..."):
-
-                    # Relevant data dhundo
                     if filter_word.strip():
                         filtered = [
                             d for d in documents
@@ -132,56 +122,44 @@ if uploaded_file:
                         )[0]
                         top_idx = np.argsort(scores)[::-1][:5]
                         relevant = [documents[i] for i in top_idx]
-                        st.info(f"✅ Top {len(relevant)} relevant records mile")
+                        st.info(
+                            f"✅ Top {len(relevant)} records mile"
+                        )
 
                     if relevant:
                         prompt = f"""
-Tumhare paas yeh sales records hain:
+Sales Records:
 {chr(10).join(relevant)}
 
 Sawaal: {sawaal}
-
 Hindi mein seedha aur accurate jawab do.
 Numbers aur facts include karo.
-Sirf in records ke basis pe jawab do.
 """
                         jawab = ask_ai(prompt, API_KEY)
                         st.success("✅ AI ka Jawab:")
                         st.write(jawab)
 
-                        with st.expander(
-                            "🔍 Relevant Records dekho"
-                        ):
+                        with st.expander("🔍 Records dekho"):
                             for i, rec in enumerate(relevant):
                                 st.text(f"{i+1}. {rec}")
                     else:
-                        st.warning(
-                            "⚠️ Koi record nahi mila! "
-                            "Filter word check karo."
-                        )
+                        st.warning("⚠️ Koi record nahi mila!")
 
-        # Quick Questions
         st.markdown("---")
-        st.markdown("#### ⚡ Quick Sawaal:")
+        st.markdown("#### ⚡ Quick Buttons:")
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            if st.button("💰 Payment Pending Summary"):
+            if st.button("💰 Pending Summary"):
                 pending = df[
                     df['PO/Delivery Status'] == 'Payment Pending'
                 ]
-                st.metric(
-                    "Total Pending Orders",
-                    pending['OMS Order'].nunique()
-                )
-                st.metric(
-                    "Total Qty",
-                    f"{int(pending['Qty'].sum()):,}"
-                )
-                st.metric(
-                    "Partners",
-                    pending['Partner Name'].nunique()
-                )
+                st.metric("Pending Orders",
+                    int(pending['OMS Order'].nunique()))
+                st.metric("Total Qty",
+                    f"{int(pending['Qty'].sum()):,}")
+                st.metric("Partners",
+                    int(pending['Partner Name'].nunique()))
 
         with col2:
             if st.button("📦 Top Partners"):
@@ -193,29 +171,23 @@ Sirf in records ke basis pe jawab do.
                 courier = df['Courier'].value_counts().head(5)
                 st.dataframe(courier)
 
-    # ================================
     # TAB 2: DASHBOARD
-    # ================================
     with tab2:
         st.markdown("### 📊 Complete Sales Dashboard")
 
-        # Metrics
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("📦 Total Orders", f"{len(df):,}")
+            st.metric("📦 Total Rows", f"{len(df):,}")
         with col2:
             delivered = len(
                 df[df['PO/Delivery Status'] == 'Delivered']
             )
             st.metric("✅ Delivered", f"{delivered:,}")
         with col3:
-            pending_count = len(
+            pend = len(
                 df[df['PO/Delivery Status'] == 'Payment Pending']
             )
-            st.metric(
-                "🔴 Payment Pending",
-                f"{pending_count:,}"
-            )
+            st.metric("🔴 Payment Pending", f"{pend:,}")
         with col4:
             st.metric(
                 "🤝 Partners",
@@ -223,16 +195,12 @@ Sirf in records ke basis pe jawab do.
             )
 
         st.markdown("---")
-
-        # Charts
         col1, col2 = st.columns(2)
 
         with col1:
             st.markdown("#### 📦 Top 10 Partners")
-            top_partners = df[
-                'Partner Name'
-            ].value_counts().head(10)
-            st.bar_chart(top_partners)
+            top_p = df['Partner Name'].value_counts().head(10)
+            st.bar_chart(top_p)
 
         with col2:
             st.markdown("#### 📊 Order Status")
@@ -240,44 +208,36 @@ Sirf in records ke basis pe jawab do.
             st.bar_chart(status)
 
         col1, col2 = st.columns(2)
-
         with col1:
             st.markdown("#### 📍 Top Locations")
-            locations = df['Locations'].value_counts().head(10)
-            st.bar_chart(locations)
+            locs = df['Locations'].value_counts().head(10)
+            st.bar_chart(locs)
 
         with col2:
             st.markdown("#### 🚚 Courier Performance")
-            couriers = df['Courier'].value_counts().head(6)
-            st.bar_chart(couriers)
+            cour = df['Courier'].value_counts().head(6)
+            st.bar_chart(cour)
 
-        # Full Status Table
-        st.markdown("#### 📋 Complete Status Breakdown")
-        status_df = df.groupby(
-            'PO/Delivery Status'
-        ).agg(
-            Orders=('OMS Order', 'nunique'),
-            SKUs=('SKU', 'count'),
-            Total_Qty=('Qty', 'sum')
-        ).reset_index().sort_values('Orders', ascending=False)
+        st.markdown("#### 📋 Status Breakdown")
+        status_df = df.groupby('PO/Delivery Status').size(
+        ).reset_index(name='Count').sort_values(
+            'Count', ascending=False
+        )
         st.dataframe(status_df, use_container_width=True)
 
-    # ================================
     # TAB 3: PAYMENT PENDING
-    # ================================
     with tab3:
         st.markdown("### 💰 Payment Pending Report")
 
         pending_df = df[
             df['PO/Delivery Status'] == 'Payment Pending'
-        ]
+        ].copy()
 
-        # Metrics
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric(
                 "Total Orders",
-                pending_df['OMS Order'].nunique()
+                int(pending_df['OMS Order'].nunique())
             )
         with col2:
             st.metric(
@@ -286,69 +246,79 @@ Sirf in records ke basis pe jawab do.
             )
         with col3:
             st.metric(
-                "Partners Affected",
-                pending_df['Partner Name'].nunique()
+                "Partners",
+                int(pending_df['Partner Name'].nunique())
             )
 
         st.markdown("---")
 
-        # Partner wise table
-        result = pending_df.groupby('Partner Name').agg(
-            Unique_Orders=('OMS Order', 'nunique'),
-            Total_SKUs=('SKU', 'count'),
-            Total_Qty=('Qty', 'sum')
-        ).reset_index().sort_values(
-            'Total_Qty', ascending=False
-        )
-        result.index = range(1, len(result)+1)
+        # Partner wise - FIXED
+        partner_group = []
+        for partner, group in pending_df.groupby('Partner Name'):
+            partner_group.append({
+                'Partner Name': partner,
+                'Unique Orders': group['OMS Order'].nunique(),
+                'Total SKUs': len(group),
+                'Total Qty': int(group['Qty'].sum())
+            })
+
+        result = pd.DataFrame(partner_group).sort_values(
+            'Total Qty', ascending=False
+        ).reset_index(drop=True)
+        result.index = result.index + 1
 
         st.markdown("#### 📋 Partner Wise Breakdown")
         st.dataframe(result, use_container_width=True)
 
-        # Download
         csv = result.to_csv(index=False)
         st.download_button(
-            "📥 Report Download Karo (CSV)",
+            "📥 Download Report (CSV)",
             csv,
-            "payment_pending_report.csv",
+            "payment_pending.csv",
             "text/csv",
             type="primary"
         )
 
-        # Order wise detail
         st.markdown("---")
-        st.markdown("#### 🔍 Partner Ka Detail Dekho")
-        selected_partner = st.selectbox(
+        st.markdown("#### 🔍 Partner Detail")
+        partners_list = sorted(
+            pending_df['Partner Name'].unique().tolist()
+        )
+        selected = st.selectbox(
             "Partner choose karo:",
-            options=pending_df['Partner Name'].unique()
+            options=partners_list
         )
 
-        if selected_partner:
-            partner_detail = pending_df[
-                pending_df['Partner Name'] == selected_partner
-            ].groupby('OMS Order').agg(
-                Total_Qty=('Qty', 'sum'),
-                SKU_Count=('SKU', 'count'),
-                Location=('Locations', 'first')
-            ).reset_index()
+        if selected:
+            detail = []
+            partner_data = pending_df[
+                pending_df['Partner Name'] == selected
+            ]
+            for oms, grp in partner_data.groupby('OMS Order'):
+                detail.append({
+                    'OMS Order': oms,
+                    'Total Qty': int(grp['Qty'].sum()),
+                    'SKU Count': len(grp),
+                    'Location': grp['Locations'].iloc[0]
+                })
 
-            st.dataframe(
-                partner_detail,
-                use_container_width=True
-            )
+            detail_df = pd.DataFrame(detail)
+            st.dataframe(detail_df, use_container_width=True)
             st.info(
-                f"Total: {partner_detail['OMS Order'].nunique()} "
-                f"orders | "
-                f"{int(partner_detail['Total_Qty'].sum()):,} qty"
+                f"Total: {len(detail)} orders | "
+                f"{int(partner_data['Qty'].sum()):,} qty"
             )
 
 else:
-    st.info("👈 Sidebar mein Excel file upload karo shuru karne ke liye!")
+    st.info(
+        "👈 Sidebar mein Excel file upload karo "
+        "shuru karne ke liye!"
+    )
     st.markdown("""
-    ### 🚀 Yeh Bot Kar Sakta Hai:
-    | Feature | Description |
-    |---------|-------------|
-    | 💬 Chatbot | Koi bhi sawaal poochho Hindi mein |
-    | 📊 Dashboard | Charts aur graphs se poora overview |
-    | 💰 Payment Pending | Partner wise detailed report |
-    """)
+### 🚀 Yeh Bot Kar Sakta Hai:
+| Feature | Description |
+|---------|-------------|
+| 💬 Chatbot | Koi bhi sawaal poochho Hindi mein |
+| 📊 Dashboard | Charts aur graphs se poora overview |
+| 💰 Payment Pending | Partner wise detailed report |
+""")
