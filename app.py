@@ -106,10 +106,31 @@ if uploaded_file:
             if sawaal:
                 with st.spinner("🤔 Answer dhundh raha hoon..."):
                     if filter_word.strip():
-                        filtered = [
-                            d for d in documents
-                            if filter_word.lower() in d.lower()
-                        ]
+    filtered = [
+        d for d in documents
+        if filter_word.strip().lower() in d.lower()
+    ]
+    if not filtered:
+        # Direct DataFrame se nikalo
+        mask = df.apply(
+            lambda row: row.astype(str).str.contains(
+                filter_word.strip(), 
+                case=False
+            ).any(), 
+            axis=1
+        )
+        filtered_df = df[mask].head(5)
+        relevant = filtered_df.apply(
+            lambda row: (
+                f"Partner: {row['Partner Name']} | "
+                f"SKU: {row['SKU']} | "
+                f"Qty: {row['Qty']} | "
+                f"Status: {row['PO/Delivery Status']} | "
+                f"Location: {row['Locations']}"
+            ), axis=1
+        ).tolist()
+    else:
+        relevant = filtered[:5]
                         relevant = filtered[:5]
                         st.info(
                             f"✅ '{filter_word}' → "
